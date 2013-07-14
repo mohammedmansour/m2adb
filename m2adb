@@ -1,0 +1,790 @@
+#!/bin/bash
+
+#the m2adb script
+
+welcome()
+{
+	 clear
+         echo "######### Welcome To M2A DBMS ##############" 
+         echo "Today Is $(date) And Server Name Is $(hostname)" 
+         echo "----Please Select Only One From This Menu---" 
+
+}
+welcome
+
+#this function for creating the database 
+create_database()
+{
+ read -p "Enter The Name Of Your Database : " dbname
+ if [ -d $dbname ] 
+  then echo "This DB Is Already Exist "
+ else
+  {
+    mkdir $dbname && echo "DB Created Successfully " 
+  }
+ fi
+
+}
+############################################################
+#function for selecting the database that you want to work on
+
+declare -a dbArr
+use_database()
+{
+ i=1
+ 
+ echo "##### Select The Database That You Want To Use : ####"
+ for dbname in `ls`
+ do
+ if [ -d $dbname ] 
+  then 
+   {
+ 
+    dbArr[$i]=$dbname
+    echo  " $((i)). $dbname " 
+    
+   }
+ i=$((i+1))
+ fi
+ done
+ echo "#####################################################"
+ read -p "Enter your choice [ 1 - ${#dbArr[@]} ] " chosnDb 
+ echo "${dbArr[$chosnDb]}"
+ cd ${dbArr[$chosnDb]}
+ echo "Database Changed "
+ echo "#####################################################"
+}
+
+############################################################
+#this function for creating the table 
+declare -a colArr
+create_table()
+{
+ use_database
+ read -p "Enter The Name Of Your Table : " tblName
+ echo ${dbArr[$chosnDb]}
+ if [ -e $tblName ] 
+  then 
+   {
+    
+    echo "Table Is Already Exist "
+    cd ..
+   }
+ else
+  {
+    touch $tblName
+    chmod +x $tblName
+    echo "++################# The Table Info #########################++" > $tblName
+    echo "The Table Name Is : $tblName " >> $tblName
+    read -p "Enter The Number Of Columns : " tblNoCol
+    echo "The Number Of Columns Is : $tblNoCol" >> $tblName
+    echo "#### The Table Columns ####" >> $tblName
+     
+    curColNo=1
+    while [ $curColNo -le $tblNoCol ]
+     do
+           
+      read -p "Enter The Name Of The Column Number [$curColNo] : " curColName
+      colArr[$curColNo]=$curColName
+      echo  -n "$curColName" >> $tblName
+       ct=1  # Column data types
+      echo "Choose The Type Of The Column Number [$curColNo] : "
+       for colType in Integer String
+	 do
+          echo "$((ct)). $colType" 
+	  
+            ct=$((ct+1))
+        done
+      read -p "Enter Your Choice : " curColType 
+      case $curColType  in
+	1)
+		echo -e " : Integer" >> $tblName
+		#read -p "Press [Enter] key to continue..." readEnterKey
+	        ;;
+	
+        2)
+                echo -e " : String" >> $tblName
+		#read -p "Press [Enter] key to continue..." readEnterKey
+	        ;;
+        
+        *)
+                echo "You Must Determine The Column Data Type .. Try Again .." 
+		#read -p "Press [Enter] key to continue..." readEnterKey
+	        ;;
+
+       esac
+       
+      curColNo=$((curColNo+1))
+     done 
+
+       while true
+        do   
+         read -p "Which Column Is The Primary Key : " primaryKey  #the user will write the name of the column here
+       if [ $primaryKey -le $tblNoCol -a $primaryKey -gt 0 ]
+         then 
+           {
+             echo $primaryKey >> $tblName
+             break
+           }
+         else 
+          continue
+       fi 
+       done
+       colArrIndex=1 
+       while [ $colArrIndex -le $tblNoCol ]
+        do
+         #${colArr[colArrIndex]}   
+         if [ $colArrIndex -eq $tblNoCol ]
+          then echo -e "${colArr[colArrIndex]}" >> $tblName # we can here add the primary key attribur as a third feild
+         else 
+          echo -n "${colArr[colArrIndex]}:" >> $tblName
+         fi 
+         colArrIndex=$((colArrIndex+1))
+        done
+       echo "############################################################" >> $tblName  
+       echo "Table Created Successfully "
+     cd ..  # to come back to the main directory after creating the table
+     
+  }
+ fi
+
+}
+
+############################################################
+#this script to create the table 
+declare -a tblArr
+show_tables()
+{
+ 
+ use_database
+ j=1  
+ echo "This Is A List Of The Existing Tables In The Selected Database "
+ echo "##############################################################"
+ for tblName in `ls`
+ do
+ if [ -f $tblName -a -x $tblName ] 
+  then 
+   {
+        
+    tblArr[$j]=$tblName
+    echo  " $((j)). $tblName " 
+    
+   }
+ j=$((j+1))
+ fi
+ 
+ done
+ 
+ echo "#####################################################"
+ read -p "Enter your choice [ 1 - ${#tblArr[@]} ] " chosnTbl 
+ #echo $chosnTbl
+ echo "${tblArr[$chosnTbl]}"
+ 
+ echo "Table Changed ... At $(date) "
+ cd .. 
+ 
+}
+
+############################################################
+#this function for Showing the Database
+
+show_databases()
+{
+ j=1  
+ echo "##### This Is A list Of Existing Databases : ####"
+ for dbname in `ls `
+ do
+ if [ -d $dbname ] 
+  then 
+   {
+    # here we will copy all tables functions files
+    
+    dbArr[$j]=$dbname
+    echo  " $((j)). $dbname " 
+    
+   }
+ j=$((j+1))
+ fi
+ 
+ done
+ echo "#####################################################"
+}
+
+############################################################
+#this function for dropping a table
+
+drop_table()
+{
+ 
+ show_tables
+ cd ${dbArr[$chosnDb]}
+ rm ${tblArr[$chosnTbl]} && echo "Table Drobbed Successfully At $(date) "
+ cd .. 
+ 
+}
+
+############################################################
+#this function for Displaying A table
+display_table()
+{
+ show_tables
+ cd ${dbArr[$chosnDb]}
+ cat ${tblArr[$chosnTbl]}
+ cd ..
+}
+
+############################################################
+#this function for displaying the table columns
+# you must send the table name to display it's columns
+declare -a tblColArr
+show_columns()
+{
+       TblName=$1
+       colArrIndex=1      
+       noCols=`awk -F: '{if (NR == 3) print $2 }' $TblName`
+       lineToShow=$((noCols+6)) # this line contains the table column's names
+       pkVal=`cut -f1 -d: $TblName | head -$((noCols+5))  | tail -1 `   #the pk value not pk name
+       
+       pkCol=$((pkVal+4))
+       pkColName=`cut -f1 -d: $TblName | head -$pkCol  | tail -1 `   
+       echo "The$noCols Table Columns Are : "
+       while [ $colArrIndex -le $noCols ]
+        do
+         curColName=`cut -f$colArrIndex -d: $TblName | head -$lineToShow  | tail -1 ` # to show the names of the columns
+ 	 tblColArr[$colArrIndex]=$curColName  
+         echo  " $((colArrIndex)). $curColName " 
+	 colArrIndex=$((colArrIndex+1)) 
+        done  
+       echo "The Primary Key Is $pkColName"
+       echo "############################################################"
+       
+}
+
+
+############################################################
+#this function for Inserting Into Tables
+
+insertInto_table()
+{
+ show_tables
+ cd ${dbArr[$chosnDb]}
+ 
+ TblName=${tblArr[$chosnTbl]}
+ #show_table_info #######
+  noCols=$((`awk -F: '{if (NR == 3) print $2 }' $TblName`))
+  ###################### Data Types #############################
+  tstDataType=$((noCols+4)) # for testing the colummns data types
+  
+  ###############################################################
+  ignoredLines=$(($noCols+7))
+  ignoredLines=$((`cat $TblName | wc -l `-ignoredLines))
+  
+  pkVal=$((noCols+5)) 
+  pkVal=`cut -f1 -d: $TblName | head -$pkVal  | tail -1 ` #the pk value not pk name
+  
+ ####################### 
+  curNoCols=1 #index to the column which be enterd
+  
+ echo "Insert The Columns Values In this Sequense : " # You Want To Insert Into..pk mandatory "
+ show_columns $TblName            # to display the columns of the selected table 
+ 
+ while [ $curNoCols -le $noCols ]
+ do
+  ################################## Check The Cell Data Type #################
+  while true 
+  do 
+   read -p "Enter The $curNoCols Cell Value [You Must Enter Value ] : "  cellValu # update using pk
+    
+        curCellDataType=$(get_column_type $curNoCols )
+        curColDataType=$(chk_column_type $cellValu )
+      
+        if [ $cellValu -a $curCellDataType -eq $curColDataType -a $curCellDataType -eq 1 ]
+          then break 
+         
+        elif [ $cellValu -a $curCellDataType -eq $curColDataType -a $curCellDataType -eq 0 ]
+          then break 
+          
+         else
+             {
+              echo "Column Data Type Does Not Match "
+    
+             }  
+         fi  
+                
+     done
+      
+  ################### Check The Primary Key Value ##################  
+  if [ $curNoCols -eq $pkVal ]
+  then 
+    {
+          chkPkRtrn=$(chk_pk $cellValu)
+          if [ $chkPkRtrn -eq 1 ]
+           then
+            {
+               echo "There Is A Row Has This Pk Val ... Try Again"
+               break             
+            
+            }
+          
+          fi
+       }  
+     fi
+     
+     ####################################################################
+      if [ $curNoCols -eq $noCols ]
+       then echo -e "$cellValu" >> $TblName 
+      else
+        echo -n "$cellValu:" >> $TblName  
+      fi
+  
+  curNoCols=$((curNoCols+1))
+ done
+    
+ cd ..
+ 
+}
+############################################################
+#this function for selecting columns from A table
+display_columns()
+{
+ show_tables
+ cd ${dbArr[$chosnDb]}
+ 
+ curTblName=${tblArr[$chosnTbl]}
+  
+ echo "Choose The Column You Want To display : "
+ show_columns $curTblName            # to display the columns of the selected table 
+ ignoredLines=$((`cat $TblName | wc -l `-$noCols-7))
+ while true
+ do
+ read -p "Enter The Column Number You Want To Display [exit=-1] : " colToDisplay
+ if [ $colToDisplay -le $noCols -a $colToDisplay -gt 0 ]
+  then 
+    cut -f$colToDisplay -d: $TblName | tail -$ignoredLines
+  elif [ $colToDisplay -eq -1 ]
+    then echo " Thank You " && break
+ fi
+ done
+ cd .. 
+}
+
+############################################################
+#this function for updating a table
+
+update_table()
+{
+ show_tables
+ cd ${dbArr[$chosnDb]}
+ 
+ TblName=${tblArr[$chosnTbl]}
+ 
+  
+  pkVal=$((noCols+5)) 
+  pkVal=`cut -f1 -d: $TblName | head -$pkVal  | tail -1 ` #the pk value not pk name
+ 
+ #######################
+ while true 
+  do 
+   read -p "Which Row You Want To Update Using Primart Key : " pkToUpdate # update using pk
+    if [ $pkToUpdate ]
+     then break
+    fi 
+  done
+  
+   pkFnd=$(chk_pk $pkToUpdate)
+  if [ $pkFnd == 1 ]
+  then 
+   {
+    rowToUpdate=$(row_line_no $TblName $pkToUpdate)
+     echo "##################" 
+     echo "The Row Values Are : "
+     sed -n "${rowToUpdate}p" $TblName 
+     echo "##################"  
+     sed -i "${rowToUpdate}d" $TblName && echo "Row Deleted Successfully" 
+   }
+  else
+   {
+    echo "Sorry...This Is Not A PK Value .. Try Again Later "
+   } 
+  fi
+
+  ############33
+
+  echo "Enter The Row New Values : "
+  show_columns $TblName            # to display the columns of the selected table 
+  curNoCols=1
+  
+ 
+  while [ $curNoCols -le $noCols ]
+  do
+   
+   ################################## Check The Cell Data Type #################
+  while true 
+  do 
+   read -p "Enter The $curNoCols Cell Value [You Must Enter Value ] : "  cellValu # update using pk
+    
+        curCellDataType=$(get_column_type $curNoCols )
+        curColDataType=$(chk_column_type $cellValu )
+      
+        if [ $cellValu -a $curCellDataType -eq $curColDataType -a $curCellDataType -eq 1 ]
+          then break 
+         
+        elif [ $cellValu -a $curCellDataType -eq $curColDataType -a $curCellDataType -eq 0 ]
+          then break 
+          
+         else
+             {
+              echo "Column Data Type Does Not Match "
+    
+             }  
+         fi  
+                
+     done
+
+  
+  ##################### Check The Primary Key Value ##################  
+  if [ $curNoCols -eq $pkVal ]
+  then 
+    {
+         chkPkRtrn=$(chk_pk $cellValu)
+          if [ $chkPkRtrn -eq 1 ]
+           then
+            {
+               echo "There Is A Row Has This Pk Val ... Try Again Later"
+               break             
+            
+            }
+          
+          fi
+       }  
+     fi
+     ####################################################################
+      if [ $curNoCols -eq $noCols ]
+       then echo -e "$cellValu" >> $TblName 
+      else
+        echo -n "$cellValu:" >> $TblName  
+      fi
+  
+  curNoCols=$((curNoCols+1))
+ done
+
+  cd ..
+}
+
+############################################################
+#this function for deleting a row in table
+delete_row()
+{
+ 
+ 
+  show_tables
+  cd ${dbArr[$chosnDb]}
+  TblName=${tblArr[$chosnTbl]}
+  
+  while true 
+  do 
+   read -p "Which Row You Want To Delete Using Primart Key : " pkToDelete # update using pk
+    if [ $pkToDelete ]
+     then break
+    fi 
+  done
+ 
+  pkFnd=$(chk_pk $pkToDelete)
+  if [ $pkFnd == 1 ]
+  then 
+   {
+    rowToDelete=$(row_line_no $TblName $pkToDelete)
+     echo "##################" 
+     echo "The Row Values Are : "
+     sed -n "${rowToDelete}p" $TblName 
+     echo "##################"  
+     sed -i "${rowToDelete}d" $TblName && echo "Row Deleted Successfully" 
+   }
+  else
+   {
+    echo "Sorry...This Is Not A PK Value .. Try Again Later "
+   } 
+  fi
+    
+  
+  cd ..
+ 
+ 
+}
+
+############################################################
+#this function for displaying the table contents
+
+show_table_info()
+{
+  noCols=`awk -F: '{if (NR == 3) print $2 }' $TblName`
+  ignoredLines=$(($noCols+7))
+  ignoredLines=$((`cat $TblName | wc -l `-ignoredLines))
+  
+  pkVal=$((noCols+5)) 
+  pkVal=`cut -f1 -d: $TblName | head -$pkVal  | tail -1 ` #the pk value not pk name
+  rowCounter=$(($noCols+8))
+}
+
+############################################################
+#this function for finding the pk line number a row in table
+
+row_line_no()
+{
+  
+  
+  TblName=$1 # the send table
+  rowToDisplay=$2 # the send pk
+  ########## table Info ###########
+  noCols=`awk -F: '{if (NR == 3) print $2 }' $TblName`
+  ignoredLines=$(($noCols+7))
+  ignoredLines=$((`cat $TblName | wc -l `-ignoredLines))
+  
+  pkVal=$((noCols+5)) 
+  pkVal=`cut -f1 -d: $TblName | head -$pkVal  | tail -1 ` #the pk value not pk name
+  #################################
+   pkFndLine=`tail -$ignoredLines $TblName | grep -wn $rowToDisplay | cut -f1 -d: `
+   pkFndLine=$(($pkFndLine+$noCols+7))
+   
+   echo $pkFndLine
+  
+  
+  
+}
+
+
+############################################################
+#this function for deleting a row in table
+searchBy_pk()
+{
+  
+  show_tables
+  cd ${dbArr[$chosnDb]}
+  TblName=${tblArr[$chosnTbl]}
+  
+  ########## table Info ###########
+  noCols=`awk -F: '{if (NR == 3) print $2 }' $TblName`
+  ignoredLines=$(($noCols+7))
+  ignoredLines=$((`cat $TblName | wc -l `-ignoredLines))
+  
+  pkVal=$((noCols+5)) 
+  pkVal=`cut -f1 -d: $TblName | head -$pkVal  | tail -1 ` #the pk value not pk name
+  rowCounter=$(($noCols+8))
+  #################################
+  while true 
+  do 
+   read -p "Which Row You Want To Display Using Primart Key : " rowToDisplay # update using pk
+    if [ $rowToDisplay ]
+     then break
+    fi 
+  done
+  #################################
+  
+  pkFnd=$(chk_pk $rowToDisplay)
+  if [ $pkFnd == 1 ]
+  then 
+   {
+     echo "##################" 
+     echo "The Row Values Are : "
+     
+     pkFndLine=`tail -$ignoredLines $TblName | grep -wn $rowToDisplay | cut -f1 -d: `
+      pkFndLine=$(($pkFndLine+$noCols+7))
+     sed -n "${pkFndLine}p" $TblName  
+     echo "##################"
+   }
+  else
+    echo "Sorry...This Is Not A PK Value "
+  fi     
+   
+  
+  cd ..
+  
+}
+############################################################
+#this function for Checking the column data types
+declare -r FND=1
+declare -r NOTFND=0
+chk_pk()
+{
+       sendPkVal=$1 #the user value
+      
+       #show_table_info #######
+        noCols=`awk -F: '{if (NR == 3) print $2 }' $TblName`
+	ignoredLines=$(($noCols+7))
+	ignoredLines=$((`cat $TblName | wc -l `-ignoredLines))
+	  
+	pkVal=$((noCols+5)) 
+	pkVal=`cut -f1 -d: $TblName | head -$pkVal  | tail -1 ` #the pk value not pk name
+	 tstFound=` tail -$ignoredLines $TblName | cut -f$pkVal -d: | grep -w $sendPkVal ` #grep -x or -w or -wn
+	  [ $tstFound ] && echo $FND || echo $NOTFND
+	  
+	
+     
+       
+}
+
+############################################################
+#this function for getting the column data types
+
+get_column_type()
+{
+  #show_table_info #######
+  curNoCols=$1 #index to the column which be enterd
+  
+  noCols=$((`awk -F: '{if (NR == 3) print $2 }' $TblName`))
+  
+  curCellDataType=` cut -f2 -d: $TblName | head -$((noCols+4))  | tail -$noCols | head -$curNoCols | tail -1 `
+  if [ $curCellDataType = "Integer" ] 
+   then 
+     echo $FND
+  else
+     echo $NOTFND
+  fi  
+  
+  #echo $curCellDataType
+
+}
+############################################################
+#this function for Checking the column data types
+
+chk_column_type()
+{
+   sendColVal=$1 #the user value
+   sendColValType=${sendColVal//[^0-9]/} 
+   if [ $sendColVal -a $sendColVal -eq $sendColValType ]
+    then 
+      echo $FND
+   else
+      echo $NOTFND   
+   fi   
+ 
+}
+
+############################################################
+#this function for Deleting A Database
+
+drop_database()
+{
+ show_databases
+ 
+ read -p "Enter your choice [ 1 - ${#dbArr[@]} ] " chosnDb 
+ echo $chosnDb
+ echo "${dbArr[$chosnDb]}"
+ rm -R ${dbArr[$chosnDb]} && echo "The DB Has Been Deleted Successfully "
+ 
+}
+
+############################################################
+#this function for Helping The Users
+
+help_user()
+{
+ cat user_manual
+}
+############################################################
+#this function for Showing the User Menu
+
+userMenu()
+{
+ while :
+   do
+    
+      # display menu
+        echo "-------------------------------"
+	echo "----- M A I N - M E N U -------"
+	echo "-------------------------------"
+        echo "----- Create Actions ----------"
+	echo -e "1. Create A New Database.\t"  "2. Display Table Columns.\t"  "3. Create A New Table."
+	echo "----- Drop Actions ------------"
+	echo -e "4. Drop Database.\t"          "5. Drob Table"
+        echo "----- Display Actions ----------"
+        echo -e "6. Show Databases.\t"          "7. Show Tables.\t"   "8. Display Table With MetaData."
+        echo "9. Search In Table Using PK "  
+	echo "----- Update Actions ----------"
+	echo "10. Update Table."
+        echo "----- Insert Actions ----------"
+	echo "11. Insert Into Table"
+        echo "----- Delete Actions ----------"
+	echo "12. Delete From Table"
+        echo "----- Help --------------------"
+        echo "13. User Manual" 
+        echo "----- Exit Actions ------------"
+        echo "14. Press 111 to exit" 
+        echo "##-+-+-###-+-+-###-+-+-###-+-##" 
+        # get input from the user
+	read -p "Enter your choice [ 1 - 14 ] " choice
+	# make decision using case..in..esac
+	case $choice in
+	1)
+		create_database
+		read -p "Press [Enter] key to continue..." readEnterKey 
+	        ;;
+	
+        2)
+		display_columns
+		read -p "Press [Enter] key to continue..." readEnterKey
+		;;
+	3)
+		create_table 
+		read -p "Press [Enter] key to continue..." readEnterKey
+		;;
+        4)
+		drop_database
+		read -p "Press [Enter] key to continue..." readEnterKey
+		;;
+	5)
+                drop_table
+		read -p "Press [Enter] key to continue..." readEnterKey
+		;;           
+        
+	6)
+                show_databases 
+		read -p "Press [Enter] key to continue..." readEnterKey
+		;;
+        
+       	7)
+                show_tables 
+		read -p "Press [Enter] key to continue..." readEnterKey
+		;;
+        8)
+                display_table 
+		read -p "Press [Enter] key to continue..." readEnterKey
+		;;
+	9)
+                searchBy_pk
+		read -p "Press [Enter] key to continue..." readEnterKey
+		;;
+        10)
+                update_table 
+		read -p "Press [Enter] key to continue..." readEnterKey
+		;;
+        11)
+                insertInto_table 
+		read -p "Press [Enter] key to continue..." readEnterKey
+		;;
+        12)
+                delete_row
+		read -p "Press [Enter] key to continue..." readEnterKey
+		;;
+        13)
+                help_user
+		read -p "Press [Enter] key to continue..." readEnterKey
+		;;
+	111)
+		echo "Bye!"
+		exit 0
+		;;
+	*)
+		echo "Error: Invalid option..."
+		read -p "Press [Enter] key to continue..." readEnterKey
+		;;
+	esac
+	done
+
+
+
+}
+
+userMenu
+
+
